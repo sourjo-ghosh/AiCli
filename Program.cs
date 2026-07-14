@@ -102,7 +102,7 @@ public static async Task Main(string[] args)
             bool firstTokenReceived = false;
             try
             {
-            await foreach (var part in chat.SendAsync(inputMessage))
+            await foreach (var part in chat.SendAsync(inputMessage, [new ReadFileTool()]))
             {
                     if (!firstTokenReceived)
                     {
@@ -151,4 +151,26 @@ static async Task ShowSpinnerAsync(CancellationToken token)
         }
         System.Console.Write("\b");
     } 
+
+/// <summary>
+///  Reads and returns the content of a text file.
+/// </summary>
+/// <param name="path">The file path to read.</param>
+[OllamaTool]
+public static string ReadFile(string path)
+    {
+        try
+        {
+            return File.ReadAllText(path);
+        } 
+        catch(FileNotFoundException)
+        {
+            return $"[Error] File {path} was not found.";
+        } 
+        catch(Exception ex)
+        {
+            return $"[Error] An error occurred while reading the file: {ex.Message}. {path}";
+        }
+    }
+   
 }
