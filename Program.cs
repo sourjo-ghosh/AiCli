@@ -1,33 +1,13 @@
 ﻿using System.Threading;
 using OllamaSharp;
 
-class AiCli
+class Jarvis
 {
-public static async Task Main(string[] args)
-{
-    System.Console.WriteLine("Welcome to AiCli.");
-    System.Console.WriteLine("Type /quit or /help");
-
-    var ollama = new OllamaApiClient( new Uri( "http://localhost:11434"));
-    ollama.SelectedModel = "llama3.2:3b";
-    var chat = new Chat(ollama);
-
-
-        while (true)
-        {
-            Console.Write("You: ");
-            string? inputMessage = Console.ReadLine();
-            string? input = inputMessage?.ToLower().Trim();
-            if(input == "/quit")
-            {   
-                System.Console.WriteLine("Bye");
-                break;
-            }
-            if(input == "/help")
-            {
-                Console.WriteLine("""
+public static void ShowHelp()
+    {
+        Console.WriteLine("""
             ================================
-            AiCli - Local AI Chat Assistant
+            jarvis - Local AI Chat Assistant
             ================================
 
             This tool lets you chat with a locally running AI model via Ollama.
@@ -35,6 +15,7 @@ public static async Task Main(string[] args)
             Commands:
             /help     Show this help message
             /quit     Exit the program
+            /clear    Clear the chat history
 
             Usage:
             Just type your message and press Enter to chat with the AI.
@@ -43,50 +24,79 @@ public static async Task Main(string[] args)
             Notes:
             - Make sure Ollama is running in the background ('ollama serve').
             - Current model in use: llama3.2:3b
-            """);
-            continue;
-            }
-            if(input == "/clear")
+        """);
+    }
+    public async static Task StopSpinner(CancellationTokenSource cts, Task task, bool firstTokenReceived)
+    {
+        cts.Cancel();
+        await task;
+        firstTokenReceived = true;
+    }
+
+public static async Task Main(string[] args)
+{
+    System.Console.WriteLine("Welcome to Jarvis.");
+    System.Console.WriteLine("Your local AI chat assistant powered by Ollama.");
+    System.Console.WriteLine("Type /help for a list of commands.");
+    System.Console.WriteLine();
+    var ollama = new OllamaApiClient( new Uri( "http://localhost:11434"));
+    ollama.SelectedModel = "llama3.2:3b";
+    var chat = new Chat(ollama);
+
+    
+        while (true)
+        {
+            Console.Write("==> ");
+            string? inputMessage = Console.ReadLine();
+            string? input = inputMessage?.ToLower().Trim();
+            switch (input)
             {
+                case "/help":
+                ShowHelp();
+                continue;
+                case "/clear":
                 chat = new Chat(ollama);
                 System.Console.WriteLine("Chat history has been cleared");
                 continue;
+
+                case "/model":
+                System.Console.WriteLine($"Current model: {ollama.SelectedModel}");
+                continue;
+                case "/quit":
+                System.Console.WriteLine("Bye");
+                return;
             }
-            Console.Write("AI: ");
+            if(string.IsNullOrWhiteSpace(inputMessage))
+            {
+                continue;
+            }
+            Console.Write("Jarvis: ");
             var SpinnerCTS = new CancellationTokenSource();
             var SpinnerTask = ShowSpinnerAsync(SpinnerCTS.Token);
             bool firstTokenReceived = false;
-
             try
             {
             await foreach (var part in chat.SendAsync(inputMessage))
             {
                     if (!firstTokenReceived)
                     {
-                    SpinnerCTS.Cancel();
-                    await SpinnerTask;
-                    firstTokenReceived = true;
+                    await StopSpinner(SpinnerCTS, SpinnerTask, firstTokenReceived);
                     }
                     System.Console.Write(part);
             }
-            if (!firstTokenReceived)
-            {
-            SpinnerCTS.Cancel();
-            await SpinnerTask;
-            }
             } catch (HttpRequestException ex)
             {
-                if (!firstTokenReceived) { SpinnerCTS.Cancel(); await SpinnerTask; }
+                if (!firstTokenReceived) { await StopSpinner(SpinnerCTS, SpinnerTask, firstTokenReceived); }
                 System.Console.WriteLine();
                 System.Console.WriteLine($"[Error] Could not connect to Ollama. Make sure 'ollama serve' is running. ({ex.Message}");
             } catch (TaskCanceledException ex)
             {
-                if (!firstTokenReceived) { SpinnerCTS.Cancel(); await SpinnerTask; }
+                if (!firstTokenReceived) { await StopSpinner(SpinnerCTS, SpinnerTask, firstTokenReceived); }
                 System.Console.WriteLine();
                 System.Console.WriteLine($"[Error] The request timed out. The model might be taking too long to respond. {ex.Message}");
             } catch (Exception ex)
             {
-                if (!firstTokenReceived) { SpinnerCTS.Cancel(); await SpinnerTask; }
+                if (!firstTokenReceived) { await StopSpinner(SpinnerCTS, SpinnerTask, firstTokenReceived); }
                 System.Console.WriteLine();
                 System.Console.WriteLine($"[Unexpected Error] {ex.GetType().Name}: {ex.Message}");
             }
@@ -99,7 +109,6 @@ static async Task ShowSpinnerAsync(CancellationToken token)
     {
         string[] frames = { "|", "/", "-", "\\" };
         int i = 0;
-
         try
         {
             while (!token.IsCancellationRequested)
@@ -112,9 +121,8 @@ static async Task ShowSpinnerAsync(CancellationToken token)
         }
         catch (TaskCanceledException)
         {
-            
+            // Intentionally left empty to handle cancellation without throwing an exception
         }
         System.Console.Write("\b");
     } 
-
 }
