@@ -1,4 +1,5 @@
-﻿using OllamaSharp;
+﻿using System.Threading;
+using OllamaSharp;
 
 class AiCli
 {
@@ -45,23 +46,47 @@ public static async Task Main(string[] args)
             """);
             continue;
             }
+            if(input == "/clear")
+            {
+                chat = new Chat(ollama);
+                System.Console.WriteLine("Chat history has been cleared");
+                continue;
+            }
             Console.Write("AI: ");
+            var SpinnerCTS = new CancellationTokenSource();
+            var SpinnerTask = ShowSpinnerAsync(SpinnerCTS.Token);
+            bool firstTokenReceived = false;
+
             try
             {
             await foreach (var part in chat.SendAsync(inputMessage))
             {
-                System.Console.Write(part);
+                    if (!firstTokenReceived)
+                    {
+                    SpinnerCTS.Cancel();
+                    await SpinnerTask;
+                    firstTokenReceived = true;
+                    }
+                    System.Console.Write(part);
+            }
+            if (!firstTokenReceived)
+            {
+            SpinnerCTS.Cancel();
+            await SpinnerTask;
             }
             } catch (HttpRequestException ex)
             {
+                if (!firstTokenReceived) { SpinnerCTS.Cancel(); await SpinnerTask; }
                 System.Console.WriteLine();
                 System.Console.WriteLine($"[Error] Could not connect to Ollama. Make sure 'ollama serve' is running. ({ex.Message}");
             } catch (TaskCanceledException ex)
             {
+                if (!firstTokenReceived) { SpinnerCTS.Cancel(); await SpinnerTask; }
                 System.Console.WriteLine();
                 System.Console.WriteLine($"[Error] The request timed out. The model might be taking too long to respond. {ex.Message}");
             } catch (Exception ex)
             {
+                if (!firstTokenReceived) { SpinnerCTS.Cancel(); await SpinnerTask; }
                 System.Console.WriteLine();
                 System.Console.WriteLine($"[Unexpected Error] {ex.GetType().Name}: {ex.Message}");
             }
@@ -69,4 +94,27 @@ public static async Task Main(string[] args)
             System.Console.WriteLine();
         }
 }
+
+static async Task ShowSpinnerAsync(CancellationToken token)
+    {
+        string[] frames = { "|", "/", "-", "\\" };
+        int i = 0;
+
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                System.Console.Write(frames[i % frames.Length]);
+                await Task.Delay(100, token);
+                System.Console.Write("\b");
+                i++;
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            
+        }
+        System.Console.Write("\b");
+    } 
+
 }
