@@ -1,4 +1,5 @@
 ﻿using System.Threading;
+using System.Linq;
 using OllamaSharp;
 
 class Jarvis
@@ -40,7 +41,8 @@ public static async Task Main(string[] args)
     System.Console.WriteLine("Type /help for a list of commands.");
     System.Console.WriteLine();
     var ollama = new OllamaApiClient( new Uri( "http://localhost:11434"));
-    ollama.SelectedModel = "llama3.2:3b";
+    string CurrentModel = "llama3.2:3b";
+    ollama.SelectedModel =CurrentModel;
     var chat = new Chat(ollama);
 
     
@@ -68,6 +70,30 @@ public static async Task Main(string[] args)
             }
             if(string.IsNullOrWhiteSpace(inputMessage))
             {
+                continue;
+            }
+            if(input == "/models")
+            {
+                var models = (await ollama.ListLocalModelsAsync()).ToList();
+                System.Console.WriteLine("Available models:");
+                for(int i = 0; i < models.Count; i++)
+                {   
+                    string markar = ollama.SelectedModel == models[i].Name ? "*" : "";
+                    System.Console.WriteLine($"-{i + 1}. {models[i].Name} {markar}");
+                }
+                Console.Write("Type a number to select, or press Enter to cancel: ");
+                string? choice = Console.ReadLine();
+                if(int.TryParse(choice, out int AiModel))
+                {
+                    if(AiModel <= models.Count) 
+                    {
+                        ollama.SelectedModel = models[AiModel -1].Name;
+                        System.Console.WriteLine($"{ollama.SelectedModel} is selected");
+                    }
+                } else
+                {
+                    System.Console.WriteLine($"Cancelled");
+                }
                 continue;
             }
             Console.Write("Jarvis: ");
